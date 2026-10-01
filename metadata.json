@@ -1,0 +1,7 @@
+{
+  "name": "Tamjid Mart",
+  "description": "Tamjid Mart multi-category eCommerce catalog: Node.js API + Supabase PostgreSQL + React + Tailwind",
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
