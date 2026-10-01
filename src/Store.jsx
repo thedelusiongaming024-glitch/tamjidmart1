@@ -2,6 +2,7 @@ import {createContext,useContext,useEffect,useState,useMemo} from 'react';
 import {Link,Outlet,useLocation,useParams,useNavigate} from 'react-router-dom';
 import {api,thumb,dl,track,safe,waUrl,telUrl,ProductPlaceholderSVG} from './lib';
 import {translations} from './translations';
+import {initialData} from './initialData';
 
 const Ctx=createContext();
 export const useD=()=>useContext(Ctx);
@@ -13,7 +14,8 @@ const toBnNum=(n)=>{
 };
 
 export function DataProvider({children}){
-  const [d,setD]=useState(window.__DATA__||null);
+  // Prefer SSR window.__DATA__, then bundled initialData fallback, then null
+  const [d,setD]=useState(window.__DATA__||initialData||null);
   const [err,setErr]=useState(false);
   const [toast,setToast]=useState('');
   const [contactProduct,setContactProduct]=useState(null);
@@ -35,7 +37,18 @@ export function DataProvider({children}){
   };
 
   useEffect(()=>{
-    if(!d) api('/public').then(setD).catch(()=>setErr(true));
+    // Seamless background sync with live API / Supabase database
+    api('/public')
+      .then(live=>{
+        if(live && live.products && live.products.length > 0){
+          setD(live);
+          setErr(false);
+        }
+      })
+      .catch((e)=>{
+        // Only trigger hard error if no data at all (not even fallback)
+        if(!d && !initialData) setErr(true);
+      });
   },[]);
 
   const showToast=(msg)=>{
@@ -61,7 +74,24 @@ export function DataProvider({children}){
     return lang==='bn'?'সাধারণ ক্যাটাগরি':'General Category';
   };
 
-  if(err) return <p className="p-10 text-center text-[#5c412f]">Could not load the catalog. Please refresh.</p>;
+  if(err && !d) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center bg-[#faf8f5]">
+        <p className="text-xl font-serif text-[#5c412f] mb-4">
+          {lang==='bn'?'ক্যাটালগ লোড করা সম্ভব হয়নি। দয়া করে আবার চেষ্টা করুন।':'Could not load the catalog. Please retry.'}
+        </p>
+        <button
+          onClick={()=>{
+            setErr(false);
+            api('/public').then(setD).catch(()=>setErr(true));
+          }}
+          className="px-6 py-2.5 rounded-xl bg-[#5c412f] text-white font-semibold text-sm hover:bg-[#432f22] transition-all"
+        >
+          {lang==='bn'?'পুনরায় লোড করুন':'Retry'}
+        </button>
+      </div>
+    );
+  }
   if(!d) return <div className="min-h-screen grid place-items-center text-[#78716c] font-serif text-2xl">লোড হচ্ছে তানজিদ মার্ট...</div>;
 
   const categoriesWithAll=[{id:'all',name:t('filterAll')},...(d.categories||[])];
