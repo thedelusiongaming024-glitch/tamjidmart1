@@ -5,9 +5,19 @@
 @layer base {
   html {
     scroll-behavior: smooth;
+    touch-action: manipulation;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
   body {
     @apply bg-[#faf8f5] text-ink font-sans antialiased min-h-screen selection:bg-espresso selection:text-white;
+    touch-action: manipulation;
+  }
+  /* Prevent iOS mobile Safari auto-zoom on form field focus */
+  @media (max-width: 768px) {
+    input, select, textarea, .input {
+      font-size: 16px !important;
+    }
   }
   body:before {
     content: "";
