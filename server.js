@@ -13,6 +13,7 @@ const {
   pgInsertBanner,
   pgDeleteBanner,
   pgInsertEnquiry,
+  pgDeleteEnquiry,
   pgTrackMetric,
   pgUpdateSettings
 } = require('./db');
@@ -93,6 +94,27 @@ loadDbFromPostgres().then(pgData => {
 const ssr = require('./ssr')(() => db), enqRate = new Map(), DIST = path.join(__dirname, 'dist');
 const MIME = { '.html':'text/html', '.css':'text/css', '.js':'text/javascript', '.png':'image/png', '.jpg':'image/jpeg', '.webp':'image/webp', '.gif':'image/gif', '.svg':'image/svg+xml' };
 const sessions = new Map(), fails = new Map();
+const SESSION_SECRET = process.env.SESSION_SECRET || 'tamjid_mart_secure_session_secret_2026';
+function signToken(username, maxAgeMs = 864e5 * 7) {
+  const exp = Date.now() + maxAgeMs;
+  const payload = `${username}:${exp}`;
+  const sig = crypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('hex');
+  return `${payload}:${sig}`;
+}
+function verifyToken(token) {
+  if (!token || typeof token !== 'string') return false;
+  const parts = token.split(':');
+  if (parts.length !== 3) return false;
+  const [username, expStr, sig] = parts;
+  const exp = parseInt(expStr, 10);
+  if (isNaN(exp) || exp < Date.now()) return false;
+  const expectedSig = crypto.createHmac('sha256', SESSION_SECRET).update(`${username}:${exp}`).digest('hex');
+  if (sig.length !== expectedSig.length) return false;
+  try {
+    return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expectedSig)) ? username : false;
+  } catch (_) { return false; }
+}
+
 const send = (res, c, o, h = {}) => { res.writeHead(c, { 'Content-Type':'application/json', ...h }); res.end(JSON.stringify(o)); };
 const body = (req, max = 1e6) => new Promise((ok, no) => {
   let n = 0, c = [];
@@ -109,8 +131,10 @@ const body = (req, max = 1e6) => new Promise((ok, no) => {
 
 const authed = req => {
   const h = req.headers;
-  const t = (h.cookie || '').match(/sid=([a-f0-9]+)/)?.[1] || h['x-session-token'] || (h.authorization || '').replace(/^Bearer\s+/i, '');
-  return t && sessions.get(t) > Date.now() ? t : null;
+  const t = (h.cookie || '').match(/sid=([^\s;]+)/)?.[1] || h['x-session-token'] || (h.authorization || '').replace(/^Bearer\s+/i, '');
+  if (!t) return null;
+  if (verifyToken(t)) return t;
+  return sessions.get(t) > Date.now() ? t : null;
 };
 
 const ALLOW = {
@@ -203,8 +227,8 @@ http.createServer(async (req, res) => {
 
       db.enquiries.unshift(newEnquiry);
       db.enquiries.length = Math.min(db.enquiries.length, 2000);
-      pgInsertEnquiry(newEnquiry);
-      save();
+      await pgInsertEnquiry(newEnquiry);
+      saveSoon();
       return send(res, 200, { ok: 1 });
     }
 
@@ -218,9 +242,9 @@ http.createServer(async (req, res) => {
       const ok = inputUser === targetUser && inputHash.length === targetHash.length && crypto.timingSafeEqual(inputHash, targetHash);
       if (!ok) { return send(res, 401, { error: 'Wrong username or password.' }); }
 
-      const t = crypto.randomBytes(24).toString('hex');
-      sessions.set(t, Date.now() + 864e5);
-      return send(res, 200, { ok: 1, token: t }, { 'Set-Cookie': `sid=${t}; Path=/; Max-Age=86400; SameSite=Lax` });
+      const t = signToken(a.user || 'admin');
+      sessions.set(t, Date.now() + 864e5 * 7);
+      return send(res, 200, { ok: 1, user: a.user, token: t }, { 'Set-Cookie': `sid=${t}; Path=/; Max-Age=604800; SameSite=Lax; HttpOnly` });
     }
 
     // POST /api/logout - Admin logout
@@ -234,8 +258,16 @@ http.createServer(async (req, res) => {
     if (!authed(req)) return send(res, 401, { error: 'Please sign in.' });
     const [,,, r, id] = p.split('/');
 
-    // GET /api/admin/all - Get full database records for admin
+    // GET /api/admin/all - Get full live database records from cloud
     if (r === 'all' && m === 'GET') {
+      try {
+        const pgData = await loadDbFromPostgres();
+        if (pgData) {
+          db = pgData;
+          db.settings = { ...db.settings, siteUrl:'',seoTitle:'',seoDescription:'',keywords:'',ogImage:'',gtmId:'',gaId:'',...pgData.settings };
+          db.enquiries = db.enquiries || [];
+        }
+      } catch (_) {}
       return send(res, 200, {
         settings: db.settings,
         categories: db.categories,
@@ -249,9 +281,9 @@ http.createServer(async (req, res) => {
     // PUT /api/admin/settings - Update site settings in DB
     if (r === 'settings' && m === 'PUT') {
       const b = await body(req);
-      for (const k in db.settings) if (k in b) db.settings[k] = String(b[k]).slice(0, 2000);
-      pgUpdateSettings(db.settings, db.admin);
-      save();
+      db.settings = { ...db.settings, ...b };
+      await pgUpdateSettings(db.settings, db.admin);
+      saveSoon();
       return send(res, 200, db.settings);
     }
 
@@ -267,8 +299,8 @@ http.createServer(async (req, res) => {
       a.salt = crypto.randomBytes(8).toString('hex');
       a.hash = hash(b.password, a.salt);
       if (b.user) a.user = String(b.user).slice(0, 40);
-      pgUpdateSettings(db.settings, a);
-      save();
+      await pgUpdateSettings(db.settings, a);
+      saveSoon();
       return send(res, 200, { ok: 1 });
     }
 
@@ -293,11 +325,12 @@ http.createServer(async (req, res) => {
       if (m === 'POST' && r !== 'enquiries') {
         const it = { id: uid(), ...pick(await body(req), ALLOW[r]) };
         if (r === 'products') Object.assign(it, { views: 0, contacts: 0, createdAt: Date.now() });
+        if (r === 'banners') Object.assign(it, { createdAt: Date.now() });
         list.push(it);
-        if (r === 'products') pgInsertProduct(it);
-        if (r === 'categories') pgInsertCategory(it);
-        if (r === 'banners') pgInsertBanner(it);
-        save();
+        if (r === 'products') await pgInsertProduct(it);
+        if (r === 'categories') await pgInsertCategory(it);
+        if (r === 'banners') await pgInsertBanner(it);
+        saveSoon();
         return send(res, 200, it);
       }
 
@@ -308,11 +341,11 @@ http.createServer(async (req, res) => {
       if (m === 'PUT') {
         Object.assign(it, pick(await body(req), ALLOW[r]));
         it.updatedAt = Date.now();
-        if (r === 'products') pgInsertProduct(it);
-        if (r === 'categories') pgInsertCategory(it);
-        if (r === 'banners') pgInsertBanner(it);
-        if (r === 'enquiries') pgInsertEnquiry(it);
-        save();
+        if (r === 'products') await pgInsertProduct(it);
+        if (r === 'categories') await pgInsertCategory(it);
+        if (r === 'banners') await pgInsertBanner(it);
+        if (r === 'enquiries') await pgInsertEnquiry(it);
+        saveSoon();
         return send(res, 200, it);
       }
 
@@ -321,11 +354,12 @@ http.createServer(async (req, res) => {
         list.splice(list.indexOf(it), 1);
         if (r === 'categories') {
           db.products.forEach(x => { if (x.category === id) x.category = ''; });
-          pgDeleteCategory(id);
+          await pgDeleteCategory(id);
         }
-        if (r === 'products') pgDeleteProduct(id);
-        if (r === 'banners') pgDeleteBanner(id);
-        save();
+        if (r === 'products') await pgDeleteProduct(id);
+        if (r === 'banners') await pgDeleteBanner(id);
+        if (r === 'enquiries') await pgDeleteEnquiry(id);
+        saveSoon();
         return send(res, 200, { ok: 1 });
       }
     }

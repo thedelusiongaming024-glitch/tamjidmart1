@@ -2,10 +2,10 @@
 export const initialData = {
   "settings": {
     "siteName": "Tamjid Mart",
-    "tagline": "Curated Essentials & Modern Lifestyle Goods",
+    "tagline": "Updated Tagline Test 1790849139057",
     "logo": "/logo.png",
-    "whatsapp": "8801700000000",
-    "phone": "+8801700000000",
+    "whatsapp": "8801906557841",
+    "phone": "8801906557841",
     "email": "hello@tamjidmart.com",
     "address": "Savar, Dhaka, Bangladesh",
     "hours": "Saturday to Thursday, 10am to 9pm",

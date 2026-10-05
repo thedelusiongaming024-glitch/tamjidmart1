@@ -190,12 +190,12 @@ export function Shell(){
             ) : (
               <div className="flex items-center gap-2 font-serif text-xl sm:text-2xl font-bold tracking-tight text-[#1c1917]">
                 <span className="inline-block w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#1b5e20] text-white text-sm sm:text-base font-serif flex items-center justify-center shadow-sm">T</span>
-                <span>{lang==='bn'?'তানজিদ মার্ট':(S.siteName||'Tamjid Mart')}</span>
+                <span>{lang==='bn' && !S.siteName ? 'তানজিদ মার্ট' : (S.siteName || 'Tamjid Mart')}</span>
               </div>
             )}
-            {S.logo && lang === 'bn' && (
+            {S.logo && (
               <span className="hidden sm:inline-block text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/60 tracking-tight">
-                তানজিদ মার্ট
+                {lang === 'bn' ? (S.siteName || 'তানজিদ মার্ট') : (S.siteName || 'Tamjid Mart')}
               </span>
             )}
           </Link>
@@ -330,7 +330,7 @@ export function Shell(){
                 <svg className="w-3.5 h-3.5 text-[#5c412f]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
                 </svg>
-                <span>{t('callUs')} ({S.phone||'+8801700000000'})</span>
+                <span>{t('callUs')} ({S.phone||'8801906557841'})</span>
               </a>
 
               <a
@@ -1081,7 +1081,7 @@ function ContactModal({product,onClose}){
               onClick={onClose}
               className="w-full py-3.5 rounded-xl font-semibold bg-[#5c412f] text-white text-xs hover:bg-[#453022] flex items-center justify-center gap-2 shadow-sm transition-all"
             >
-              <span>{t('callDirectly')} ({S.phone||'+8801700000000'})</span>
+              <span>{t('callDirectly')} ({S.phone||'8801906557841'})</span>
             </a>
           </div>
         </div>
@@ -1196,7 +1196,7 @@ export function Home(){
   },[search]);
 
   useEffect(()=>{
-    document.title=lang==='bn' ? `তানজিদ মার্ট | খাঁটি প্রিমিয়াম প্রোডাক্টস ও লাইফস্টাইল কালেকশন` : (S.seoTitle||`${S.siteName||'Tamjid Mart'} | ${S.tagline||'Curated Essentials & Lifestyle'}`);
+    document.title = S?.seoTitle || (S?.siteName ? `${S.siteName} | ${S.tagline || 'Curated Essentials & Lifestyle'}` : (lang==='bn' ? 'তানজিদ মার্ট | খাঁটি প্রিমিয়াম প্রোডাক্টস ও লাইফস্টাইল কালেকশন' : 'Tamjid Mart | Curated Essentials & Lifestyle'));
   },[S,lang]);
 
   // Newly dropped items (first 6 items)
@@ -1380,21 +1380,77 @@ export function Home(){
       {/* Bottom Promo Banner */}
       <BottomPromoBanner/>
 
-      {/* Send an Enquiry Section */}
-      <section id="contact" className="my-8 sm:my-12 max-w-[1360px] mx-auto px-4 lg:px-10">
-        <div className="rounded-[36px] bg-[#ede6dc] border border-[#d9ccbd] p-6 sm:p-10 lg:p-12 shadow-card">
+      {/* Send an Enquiry & Direct Store Contact Section */}
+      <section id="contact" className="my-8 sm:my-12 max-w-[1360px] mx-auto px-3 sm:px-4 lg:px-10">
+        <div className="rounded-[28px] sm:rounded-[36px] bg-[#ede6dc] border border-[#d9ccbd] p-5 sm:p-10 lg:p-12 shadow-card">
           <div className="text-center mb-8 max-w-xl mx-auto">
             <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-semibold bg-[#ddd0bf] text-[#5c412f] border border-[#cab9a4] mb-3">
               <span className="w-2 h-2 rounded-full bg-[#5c412f]"></span>
               {t('badgeEnquiry')}
             </span>
-            <h2 className="font-serif text-3xl sm:text-4xl font-bold text-[#1c1917] mb-2">
+            <h2 className="font-serif text-2xl sm:text-4xl font-bold text-[#1c1917] mb-2">
               {t('enquiryTitle')}
             </h2>
-            <p className="text-sm text-[#78716c]">
+            <p className="text-xs sm:text-sm text-[#78716c]">
               {t('enquirySubtitle')}
             </p>
           </div>
+
+          {/* Connected Live Database Settings Info Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8 max-w-4xl mx-auto">
+            {/* Phone Call */}
+            <a
+              href={telUrl(S)}
+              className="bg-white/90 hover:bg-white p-4 rounded-2xl border border-black/5 shadow-xs flex items-center gap-3 transition-transform hover:-translate-y-0.5"
+            >
+              <div className="w-10 h-10 rounded-xl bg-[#5c412f]/10 text-[#5c412f] flex items-center justify-center text-lg shrink-0">
+                📞
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] font-bold text-[#78716c] uppercase tracking-wider block">{t('callUs')}</span>
+                <span className="text-xs sm:text-sm font-bold text-[#1c1917] truncate block">{S.phone || '8801906557841'}</span>
+              </div>
+            </a>
+
+            {/* WhatsApp Chat */}
+            <a
+              href={waUrl(S)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-white/90 hover:bg-white p-4 rounded-2xl border border-black/5 shadow-xs flex items-center gap-3 transition-transform hover:-translate-y-0.5"
+            >
+              <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-lg shrink-0">
+                💬
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] font-bold text-[#78716c] uppercase tracking-wider block">WhatsApp</span>
+                <span className="text-xs sm:text-sm font-bold text-[#1c1917] truncate block">{S.whatsapp || '8801906557841'}</span>
+              </div>
+            </a>
+
+            {/* Store Location */}
+            <div className="bg-white/90 p-4 rounded-2xl border border-black/5 shadow-xs flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-[#5c412f]/10 text-[#5c412f] flex items-center justify-center text-lg shrink-0">
+                📍
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] font-bold text-[#78716c] uppercase tracking-wider block">{lang==='bn'?'ঠিকানা':'Store Address'}</span>
+                <span className="text-xs font-semibold text-[#1c1917] line-clamp-2 block leading-snug">{S.address || 'Savar, Dhaka, Bangladesh'}</span>
+              </div>
+            </div>
+
+            {/* Operating Hours */}
+            <div className="bg-white/90 p-4 rounded-2xl border border-black/5 shadow-xs flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-[#5c412f]/10 text-[#5c412f] flex items-center justify-center text-lg shrink-0">
+                🕒
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] font-bold text-[#78716c] uppercase tracking-wider block">{lang==='bn'?'সময়সূচী':'Hours'}</span>
+                <span className="text-xs font-semibold text-[#1c1917] line-clamp-2 block leading-snug">{S.hours || 'Sat - Thu: 10am - 9pm'}</span>
+              </div>
+            </div>
+          </div>
+
           <EnquiryForm pre={new URLSearchParams(search).get('enquire')}/>
         </div>
       </section>
@@ -1413,10 +1469,10 @@ export function ProductPage(){
   useEffect(()=>{
     if(!p) return;
     setSelectedImg(0);
-    document.title=`${p.name} | ${lang==='bn'?'তানজিদ মার্ট':(S.siteName||'Tamjid Mart')}`;
+    document.title=`${p.name} | ${S?.siteName || (lang==='bn'?'তানজিদ মার্ট':'Tamjid Mart')}`;
     track(p.id,'view');
     dl({event:'view_item',item_id:p.id,item_name:p.name});
-  },[p?.id,lang]);
+  },[p?.id,lang,S]);
 
   if(!p) return <NotFound/>;
 
@@ -1520,7 +1576,7 @@ export function ProductPage(){
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
               </svg>
-              <span>{t('callUs')}: {S.phone||'+8801700000000'}</span>
+              <span>{t('callUs')}: {S.phone||'8801906557841'}</span>
             </a>
           </div>
         </div>
@@ -1593,7 +1649,7 @@ function Footer(){
               )}
             </Link>
             <p className="text-xs sm:text-sm text-neutral-400 max-w-sm leading-relaxed">
-              {t('footerAbout')}
+              {S.aboutText || t('footerAbout')}
             </p>
 
             {/* Newsletter Box */}
@@ -1643,25 +1699,37 @@ function Footer(){
             </ul>
           </div>
 
-          {/* Help Links */}
+          {/* Help & Contact Links with Database Settings */}
           <div className="md:col-span-3 space-y-3">
             <h4 className="text-xs font-bold uppercase tracking-wider text-white">{t('helpCol')}</h4>
             <ul className="space-y-2 text-xs text-neutral-400">
               <li><a href="/#contact" className="hover:text-white transition-colors">{t('howToOrder')}</a></li>
               <li><a href="/#contact" className="hover:text-white transition-colors">{t('checkStock')}</a></li>
-              <li><a href={telUrl(S)} className="hover:text-white transition-colors">{t('customerCare')}: {S.phone||'+8801700000000'}</a></li>
-              <li><a href={`mailto:${S.email||'hello@tamjidmart.com'}`} className="hover:text-white transition-colors">{t('emailContact')}: {S.email||'hello@tamjidmart.com'}</a></li>
+              <li><a href={telUrl(S)} className="hover:text-white transition-colors">{t('customerCare')}: {S.phone || '8801906557841'}</a></li>
+              <li><a href={`mailto:${S.email||'hello@tamjidmart.com'}`} className="hover:text-white transition-colors">{t('emailContact')}: {S.email || 'hello@tamjidmart.com'}</a></li>
+              {S.address && (
+                <li className="text-neutral-400 flex items-start gap-1.5 pt-1">
+                  <span>📍</span>
+                  <span>{S.address}</span>
+                </li>
+              )}
+              {S.hours && (
+                <li className="text-neutral-400 flex items-start gap-1.5">
+                  <span>🕒</span>
+                  <span>{S.hours}</span>
+                </li>
+              )}
             </ul>
           </div>
         </div>
 
         {/* Bottom Row with Copyright and Social Links */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-neutral-500">
-          <p>&copy; {new Date().getFullYear()} {t('copyright')}</p>
+          <p>&copy; {new Date().getFullYear()} {S.siteName || 'Tamjid Mart'}. {t('copyright')}</p>
           <div className="flex items-center gap-6">
-            <a href={safe(S.facebook)} target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Facebook</a>
-            <a href={safe(S.instagram)} target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Instagram</a>
-            <a href={safe(S.youtube)} target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">YouTube</a>
+            {S.facebook && <a href={safe(S.facebook)} target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Facebook</a>}
+            {S.instagram && <a href={safe(S.instagram)} target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Instagram</a>}
+            {S.youtube && <a href={safe(S.youtube)} target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">YouTube</a>}
           </div>
         </div>
       </div>

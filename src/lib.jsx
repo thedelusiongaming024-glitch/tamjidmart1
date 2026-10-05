@@ -34,13 +34,26 @@ export const track = (id, type) => fetch('/api/track', { method: 'POST', headers
 export const hue = s => [...String(s)].reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
 export const safe = u => /^https?:\/\//.test(u) ? u : '#';
 
-export const waUrl = (S, p, msg) => {
-  const num = ((S && S.whatsapp) || '8801700000000').replace(/\D/g, '');
-  const text = msg || ((S && S.waMessage) || "Hello Tamjid Mart! I'm interested in {product}. Could you share more details, price and availability?").replace('{product}', p ? p.name : 'your products');
+export const formatWaNumber = (numStr) => {
+  if (!numStr) return '8801906557841';
+  let clean = String(numStr).replace(/\D/g, '');
+  if (clean.startsWith('0')) clean = '88' + clean;
+  if (!clean.startsWith('88') && clean.length === 10) clean = '880' + clean;
+  return clean || '8801906557841';
+};
+
+export const waUrl = (S, p, defaultMsg) => {
+  const num = formatWaNumber(S && S.whatsapp);
+  const template = (S && S.waMessage && S.waMessage.trim()) || defaultMsg || "Hello! I am interested in {product}. Is this available in stock?";
+  const text = template.replace('{product}', p ? p.name : 'your products');
   return `https://wa.me/${num}?text=${encodeURIComponent(text)}`;
 };
 
-export const telUrl = S => 'tel:' + ((S && S.phone) || '+8801700000000').replace(/[^\d+]/g, '');
+export const telUrl = S => {
+  const raw = (S && S.phone) || '8801906557841';
+  const clean = String(raw).replace(/[^\d+]/g, '');
+  return 'tel:' + clean;
+};
 
 // Clean, premium, minimalist brand product placeholder
 export const ProductPlaceholderSVG = ({ name = 'Product', className = 'w-full h-full' }) => {

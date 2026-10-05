@@ -3,8 +3,8 @@
   "siteName": "Tamjid Mart",
   "tagline": "Curated Essentials & Modern Lifestyle Goods",
   "logo": "/logo.png",
-  "whatsapp": "8801700000000",
-  "phone": "+8801700000000",
+  "whatsapp": "8801906557841",
+  "phone": "8801906557841",
   "email": "hello@tamjidmart.com",
   "address": "Savar, Dhaka, Bangladesh",
   "hours": "Saturday to Thursday, 10am to 9pm",
@@ -104,7 +104,7 @@
    "price": "৳ 5,400",
    "featured": true,
    "active": true,
-   "views": 65,
+   "views": 69,
    "contacts": 12,
    "seoTitle": "Studio Mechanical Ergonomic Keyboard | Tamjid Mart",
    "seoDescription": "Shop Studio 75% mechanical wireless keyboard at Tamjid Mart. Premium typing experience with gasket mount.",
@@ -233,8 +233,9 @@
    "subtitle": "Every product is hand-inspected for durability, authentic quality, and contemporary aesthetic value.",
    "btnText": "Contact Us on WhatsApp",
    "btnLink": "#contact",
-   "image": "https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1600&q=80",
-   "active": true
+   "image": "https://www.todomodo.com/cdn/shop/files/banner_home_ok_744cb7b0-a335-4183-b2a9-fe7646769e3d.png?v=1783341043&width=3840",
+   "active": true,
+   "createdAt": 1791168877232
   },
   {
    "id": "b2",
@@ -242,8 +243,10 @@
    "subtitle": "Discover verified genuine products, modern gadgets, curated fashion, and lifestyle essentials at honest value.",
    "btnText": "Browse Collection",
    "btnLink": "#products",
-   "image": "https://images.unsplash.com/photo-1472851294608-062f824d29cc?auto=format&fit=crop&w=1600&q=80",
-   "active": true
+   "image": "https://www.chefn.com/cdn/shop/collections/AllProductsBanner_copy.jpg?v=1643835579&width=2048",
+   "active": true,
+   "createdAt": 1791168877232,
+   "updatedAt": 1791168935652
   }
  ],
  "enquiries": [
@@ -254,7 +257,7 @@
    "message": "Hello, is the Aura ANC Wireless headphone in stock for delivery to Dhanmondi, Dhaka?",
    "productId": "p7",
    "productName": "Japanese Indigo Chambray Overshirt",
-   "status": "in-progress",
+   "status": "replied",
    "createdAt": 1790793233624
   }
  ]

@@ -170,9 +170,29 @@ function Enquiries({D,reload,toast}){
   {!D.enquiries.length&&<div className="panel text-mut">No enquiries yet. Messages from your website form will appear here.</div>}</>;
 }
 function SettingsPage({title,sch,D,reload,toast,actions,children}){
- const [v,setV]=useState(D.settings),[e,setE]=useState(''),set=(k,x)=>setV(o=>({...o,[k]:x}));
- const save=async()=>{try{const b={};sch.forEach(([k])=>b[k]=v[k]||'');await api('/admin/settings','PUT',b);toast('Saved');setE('');reload()}catch(x){setE(x.message)}};
- return <><Top title={title}>{actions}</Top><div className="panel">{children}<Fields sch={sch} v={v} set={set} toast={toast}/><Err>{e}</Err><button className="btn" onClick={save}>Save {title.toLowerCase()}</button></div></>;
+ const [v,setV]=useState(D.settings||{}),[e,setE]=useState(''),[busy,setBusy]=useState(false),set=(k,x)=>setV(o=>({...o,[k]:x}));
+ 
+ useEffect(()=>{
+  if(D?.settings) setV(D.settings);
+ },[D?.settings]);
+
+ const save=async()=>{
+  setBusy(true);
+  try{
+   const b={};
+   sch.forEach(([k])=>b[k]=v[k]!==undefined?v[k]:'');
+   await api('/admin/settings','PUT',b);
+   toast('Settings saved to database');
+   setE('');
+   reload();
+  }catch(x){
+   setE(x.message||'Failed to save settings');
+  }finally{
+   setBusy(false);
+  }
+ };
+
+ return <><Top title={title}>{actions}</Top><div className="panel">{children}<Fields sch={sch} v={v} set={set} toast={toast}/><Err>{e}</Err><button className="btn" disabled={busy} onClick={save}>{busy?'Saving...':`Save ${title.toLowerCase()}`}</button></div></>;
 }
 function Seo(P){
  const {D}=P,[f,setF]=useState(null),issues=p=>{const i=[];if(!p.images.length)i.push('No image');if((p.description||'').length<50)i.push('Short description');if((p.seoTitle||p.name).length>60)i.push('Title over 60');if(!p.seoDescription)i.push('No SEO description');else if(p.seoDescription.length>160)i.push('Description over 160');return i};
@@ -181,10 +201,11 @@ function Seo(P){
   <div className="panel"><h3 className="text-2xl mb-2">Product SEO check</h3><table className="tbl"><thead><tr><th>Product</th><th>Issues</th><th></th></tr></thead><tbody>{D.products.map(p=>{const i=issues(p);return <tr key={p.id}><td><b>{p.name}</b></td><td className="space-x-1">{i.map(x=><span key={x} className="pill off">{x}</span>)}{!i.length&&<span className="pill">Good</span>}</td><td className="text-right"><button className="btn btn-ghost btn-sm" onClick={()=>setF(p)}>Fix</button></td></tr>})}</tbody></table></div>
   {f&&<FormModal col="products" item={f} D={D} onClose={()=>setF(null)} done={()=>{setF(null);P.reload()}} toast={P.toast}/>}</>;
 }
-function Account({D,toast}){
- const [v,setV]=useState({user:D.user,current:'',password:''}),[e,setE]=useState(''),s=k=>x=>setV(o=>({...o,[k]:x.target.value}));
- const save=async()=>{try{await api('/admin/password','POST',v);toast('Account updated');setE('');setV(o=>({...o,current:'',password:''}))}catch(x){setE(x.message)}};
- return <><Top title="Account"/><div className="panel max-w-md">{[['user','Username','text','username'],['current','Current password','password','current-password'],['password','New password, at least 8 characters','password','new-password']].map(([k,l,t,a])=><label key={k} className="block mb-3.5 text-[13px] font-semibold">{l}<input className="input mt-1.5 font-normal" type={t} autoComplete={a} value={v[k]} onChange={s(k)}/></label>)}<Err>{e}</Err><button className="btn" onClick={save}>Update account</button></div></>;
+function Account({D,reload,toast}){
+ const [v,setV]=useState({user:D.user,current:'',password:''}),[e,setE]=useState(''),[busy,setBusy]=useState(false),s=k=>x=>setV(o=>({...o,[k]:x.target.value}));
+ useEffect(()=>{ if(D?.user) setV(o=>({...o,user:D.user})); },[D?.user]);
+ const save=async()=>{setBusy(true);try{await api('/admin/password','POST',v);toast('Account updated');setE('');setV(o=>({...o,current:'',password:''}));reload()}catch(x){setE(x.message)}finally{setBusy(false)}};
+ return <><Top title="Account"/><div className="panel max-w-md">{[['user','Username','text','username'],['current','Current password','password','current-password'],['password','New password, at least 8 characters','password','new-password']].map(([k,l,t,a])=><label key={k} className="block mb-3.5 text-[13px] font-semibold">{l}<input className="input mt-1.5 font-normal" type={t} autoComplete={a} value={v[k]} onChange={s(k)}/></label>)}<Err>{e}</Err><button className="btn" disabled={busy} onClick={save}>{busy?'Updating...':'Update account'}</button></div></>;
 }
 function Login({done}){
  const [u,setU]=useState('admin'),[p,setP]=useState(''),[e,setE]=useState(''),[loading,setLoading]=useState(false);

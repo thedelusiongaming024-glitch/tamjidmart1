@@ -129,8 +129,10 @@ async function initSchema() {
         btn_text VARCHAR(100),
         btn_link TEXT,
         image TEXT,
-        active BOOLEAN DEFAULT true
+        active BOOLEAN DEFAULT true,
+        created_at BIGINT
       );
+      ALTER TABLE tamjid_banners ADD COLUMN IF NOT EXISTS created_at BIGINT;
     `);
 
     // Enquiries table
@@ -196,7 +198,7 @@ async function loadDbFromPostgres() {
       pool.query("SELECT * FROM tamjid_settings WHERE id = 'main'"),
       pool.query('SELECT * FROM tamjid_categories ORDER BY created_at ASC'),
       pool.query('SELECT * FROM tamjid_products ORDER BY created_at DESC'),
-      pool.query('SELECT * FROM tamjid_banners ORDER BY id ASC'),
+      pool.query('SELECT * FROM tamjid_banners ORDER BY created_at ASC NULLS LAST, id ASC'),
       pool.query('SELECT * FROM tamjid_enquiries ORDER BY created_at DESC LIMIT 2000'),
       pool.query("SELECT data FROM tamjid_app_state WHERE id = 'main'")
     ]);
@@ -239,7 +241,8 @@ async function loadDbFromPostgres() {
       btnText: r.btn_text || '',
       btnLink: r.btn_link || '',
       image: r.image || '',
-      active: r.active !== false
+      active: r.active !== false,
+      createdAt: parseInt(r.created_at || Date.now(), 10)
     }));
 
     // Format enquiries
@@ -351,8 +354,11 @@ async function pgInsertProduct(p) {
       ) VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
       ON CONFLICT (id) DO UPDATE SET
         name=$2, category=$3, description=$4, highlights=$5, images=$6::jsonb,
-        badge=$7, price=$8, featured=$9, active=$10, views=$11, contacts=$12, seo_title=$13,
-        seo_description=$14, colorway=$15, sku=$16, created_at=$17, updated_at=$18
+        badge=$7, price=$8, featured=$9, active=$10,
+        views=GREATEST(COALESCE(tamjid_products.views, 0), $11),
+        contacts=GREATEST(COALESCE(tamjid_products.contacts, 0), $12),
+        seo_title=$13, seo_description=$14, colorway=$15, sku=$16,
+        created_at=COALESCE(tamjid_products.created_at, $17), updated_at=$18
     `, [
       p.id, p.name || '', p.category || '', p.description || '', p.highlights || '',
       JSON.stringify(p.images || []), p.badge || '', p.price || '', Boolean(p.featured),
@@ -362,6 +368,7 @@ async function pgInsertProduct(p) {
     ]);
   } catch (err) {
     console.error('[PostgreSQL] Product insert error:', err.message);
+    throw err;
   }
 }
 
@@ -371,6 +378,7 @@ async function pgDeleteProduct(id) {
     await pool.query('DELETE FROM tamjid_products WHERE id = $1', [id]);
   } catch (err) {
     console.error('[PostgreSQL] Product delete error:', err.message);
+    throw err;
   }
 }
 
@@ -384,6 +392,7 @@ async function pgInsertCategory(c) {
     `, [c.id, c.name || '', c.description || '', c.image || '']);
   } catch (err) {
     console.error('[PostgreSQL] Category insert error:', err.message);
+    throw err;
   }
 }
 
@@ -394,6 +403,7 @@ async function pgDeleteCategory(id) {
     await pool.query('UPDATE tamjid_products SET category = NULL WHERE category = $1', [id]);
   } catch (err) {
     console.error('[PostgreSQL] Category delete error:', err.message);
+    throw err;
   }
 }
 
@@ -401,12 +411,13 @@ async function pgDeleteCategory(id) {
 async function pgInsertBanner(b) {
   try {
     await pool.query(`
-      INSERT INTO tamjid_banners (id, title, subtitle, btn_text, btn_link, image, active)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      INSERT INTO tamjid_banners (id, title, subtitle, btn_text, btn_link, image, active, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       ON CONFLICT (id) DO UPDATE SET title=$2, subtitle=$3, btn_text=$4, btn_link=$5, image=$6, active=$7
-    `, [b.id, b.title || '', b.subtitle || '', b.btnText || '', b.btnLink || '', b.image || '', b.active !== false]);
+    `, [b.id, b.title || '', b.subtitle || '', b.btnText || '', b.btnLink || '', b.image || '', b.active !== false, b.createdAt || Date.now()]);
   } catch (err) {
     console.error('[PostgreSQL] Banner insert error:', err.message);
+    throw err;
   }
 }
 
@@ -416,6 +427,7 @@ async function pgDeleteBanner(id) {
     await pool.query('DELETE FROM tamjid_banners WHERE id = $1', [id]);
   } catch (err) {
     console.error('[PostgreSQL] Banner delete error:', err.message);
+    throw err;
   }
 }
 
@@ -429,6 +441,17 @@ async function pgInsertEnquiry(e) {
     `, [e.id, e.name, e.phone, e.message, e.productId || '', e.productName || '', e.status || 'new', e.createdAt || Date.now()]);
   } catch (err) {
     console.error('[PostgreSQL] Enquiry insert error:', err.message);
+    throw err;
+  }
+}
+
+// DELETE enquiry from PostgreSQL
+async function pgDeleteEnquiry(id) {
+  try {
+    await pool.query('DELETE FROM tamjid_enquiries WHERE id = $1', [id]);
+  } catch (err) {
+    console.error('[PostgreSQL] Enquiry delete error:', err.message);
+    throw err;
   }
 }
 
@@ -475,6 +498,7 @@ async function pgUpdateSettings(s, admin) {
     ]);
   } catch (err) {
     console.error('[PostgreSQL] Settings update error:', err.message);
+    throw err;
   }
 }
 
@@ -505,6 +529,7 @@ module.exports = {
   pgInsertBanner,
   pgDeleteBanner,
   pgInsertEnquiry,
+  pgDeleteEnquiry,
   pgTrackMetric,
   pgUpdateSettings
 };

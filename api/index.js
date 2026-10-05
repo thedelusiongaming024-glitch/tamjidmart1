@@ -10,6 +10,7 @@ const {
   pgInsertBanner,
   pgDeleteBanner,
   pgInsertEnquiry,
+  pgDeleteEnquiry,
   pgTrackMetric,
   pgUpdateSettings
 } = require('../db');
@@ -82,10 +83,33 @@ function parseBody(req) {
   });
 }
 
+const SESSION_SECRET = process.env.SESSION_SECRET || 'tamjid_mart_secure_session_secret_2026';
+function signToken(username, maxAgeMs = 864e5 * 7) {
+  const exp = Date.now() + maxAgeMs;
+  const payload = `${username}:${exp}`;
+  const sig = crypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('hex');
+  return `${payload}:${sig}`;
+}
+function verifyToken(token) {
+  if (!token || typeof token !== 'string') return false;
+  const parts = token.split(':');
+  if (parts.length !== 3) return false;
+  const [username, expStr, sig] = parts;
+  const exp = parseInt(expStr, 10);
+  if (isNaN(exp) || exp < Date.now()) return false;
+  const expectedSig = crypto.createHmac('sha256', SESSION_SECRET).update(`${username}:${exp}`).digest('hex');
+  if (sig.length !== expectedSig.length) return false;
+  try {
+    return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expectedSig)) ? username : false;
+  } catch (_) { return false; }
+}
+
 const authed = req => {
   const h = req.headers || {};
-  const t = (h.cookie || '').match(/sid=([a-f0-9]+)/)?.[1] || h['x-session-token'] || (h.authorization || '').replace(/^Bearer\s+/i, '');
-  return t && sessions.get(t) > Date.now() ? t : null;
+  const t = (h.cookie || '').match(/sid=([^\s;]+)/)?.[1] || h['x-session-token'] || (h.authorization || '').replace(/^Bearer\s+/i, '');
+  if (!t) return null;
+  if (verifyToken(t)) return t;
+  return sessions.get(t) > Date.now() ? t : null;
 };
 
 module.exports = async function handler(req, res) {
@@ -151,7 +175,7 @@ module.exports = async function handler(req, res) {
       };
       db.enquiries = db.enquiries || [];
       db.enquiries.unshift(newEnquiry);
-      pgInsertEnquiry(newEnquiry);
+      await pgInsertEnquiry(newEnquiry);
       return send(res, 200, { ok: 1 });
     }
 
@@ -165,10 +189,18 @@ module.exports = async function handler(req, res) {
       const targetHash = Buffer.from(a.hash);
       const ok = inputUser === targetUser && inputHash.length === targetHash.length && crypto.timingSafeEqual(inputHash, targetHash);
       if (!ok) return send(res, 401, { error: 'Wrong username or password.' });
-      const token = crypto.randomBytes(24).toString('hex');
+      const token = signToken(a.user || 'admin');
       sessions.set(token, Date.now() + 864e5 * 7);
       res.setHeader('Set-Cookie', `sid=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800`);
       return send(res, 200, { ok: 1, user: a.user, token });
+    }
+
+    // POST /api/logout
+    if (p === '/api/logout') {
+      const t = authed(req);
+      if (t) sessions.delete(t);
+      res.setHeader('Set-Cookie', 'sid=; Path=/; Max-Age=0');
+      return send(res, 200, { ok: 1 });
     }
 
     // Admin protected routes
@@ -177,8 +209,16 @@ module.exports = async function handler(req, res) {
       return send(res, 401, { error: 'Unauthorized' });
     }
 
-    // GET /api/admin/all
+    // GET /api/admin/all - Load fresh records from Supabase
     if (p === '/api/admin/all' && m === 'GET') {
+      try {
+        const pgData = await loadDbFromPostgres();
+        if (pgData) {
+          db = pgData;
+          db.settings = { ...db.settings, siteUrl:'',seoTitle:'',seoDescription:'',keywords:'',ogImage:'',gtmId:'',gaId:'',...pgData.settings };
+          db.enquiries = db.enquiries || [];
+        }
+      } catch (_) {}
       return send(res, 200, {
         settings: db.settings,
         categories: db.categories,
@@ -193,8 +233,41 @@ module.exports = async function handler(req, res) {
     if (p === '/api/admin/settings' && m === 'PUT') {
       const b = await parseBody(req);
       db.settings = { ...db.settings, ...b };
-      pgUpdateSettings(db.settings);
+      await pgUpdateSettings(db.settings, db.admin);
       return send(res, 200, db.settings);
+    }
+
+    // POST /api/admin/password - Update admin credentials in DB
+    if (p === '/api/admin/password' && m === 'POST') {
+      const b = await parseBody(req), a = db.admin;
+      if (!crypto.timingSafeEqual(Buffer.from(hash(String(b.current || ''), a.salt)), Buffer.from(a.hash))) {
+        return send(res, 400, { error: 'Current password is wrong.' });
+      }
+      if (String(b.password || '').length < 8) {
+        return send(res, 400, { error: 'New password must be at least 8 characters.' });
+      }
+      a.salt = crypto.randomBytes(8).toString('hex');
+      a.hash = hash(b.password, a.salt);
+      if (b.user) a.user = String(b.user).slice(0, 40);
+      await pgUpdateSettings(db.settings, a);
+      return send(res, 200, { ok: 1 });
+    }
+
+    // POST /api/admin/upload - Handle image uploads
+    if (p === '/api/admin/upload' && m === 'POST') {
+      const b = await parseBody(req);
+      const mt = /^data:image\/(png|jpeg|webp|gif);base64,(.+)$/.exec(b.data || '');
+      if (!mt) return send(res, 400, { error: 'Use a PNG, JPG, WEBP or GIF image.' });
+      try {
+        const fs = require('fs'), path = require('path');
+        const U = path.join(process.cwd(), 'uploads');
+        if (!fs.existsSync(U)) fs.mkdirSync(U, { recursive: true });
+        const imgId = crypto.randomBytes(8).toString('hex'), n = imgId + '.' + (mt[1] === 'jpeg' ? 'jpg' : mt[1]);
+        fs.writeFileSync(path.join(U, n), Buffer.from(mt[2], 'base64'));
+        return send(res, 200, { url: '/uploads/' + n });
+      } catch (_) {
+        return send(res, 200, { url: b.data });
+      }
     }
 
     // Admin CRUD /api/admin/:resource/:id
@@ -208,10 +281,11 @@ module.exports = async function handler(req, res) {
         if (m === 'POST' && !id && r !== 'enquiries') {
           const it = { id: uid(), ...pick(await parseBody(req), ALLOW[r]) };
           if (r === 'products') Object.assign(it, { views: 0, contacts: 0, createdAt: Date.now() });
+          if (r === 'banners') Object.assign(it, { createdAt: Date.now() });
           list.push(it);
-          if (r === 'products') pgInsertProduct(it);
-          if (r === 'categories') pgInsertCategory(it);
-          if (r === 'banners') pgInsertBanner(it);
+          if (r === 'products') await pgInsertProduct(it);
+          if (r === 'categories') await pgInsertCategory(it);
+          if (r === 'banners') await pgInsertBanner(it);
           return send(res, 200, it);
         }
 
@@ -221,18 +295,22 @@ module.exports = async function handler(req, res) {
         if (m === 'PUT') {
           Object.assign(it, pick(await parseBody(req), ALLOW[r]));
           it.updatedAt = Date.now();
-          if (r === 'products') pgInsertProduct(it);
-          if (r === 'categories') pgInsertCategory(it);
-          if (r === 'banners') pgInsertBanner(it);
-          if (r === 'enquiries') pgInsertEnquiry(it);
+          if (r === 'products') await pgInsertProduct(it);
+          if (r === 'categories') await pgInsertCategory(it);
+          if (r === 'banners') await pgInsertBanner(it);
+          if (r === 'enquiries') await pgInsertEnquiry(it);
           return send(res, 200, it);
         }
 
         if (m === 'DELETE') {
           list.splice(list.indexOf(it), 1);
-          if (r === 'products') pgDeleteProduct(id);
-          if (r === 'categories') pgDeleteCategory(id);
-          if (r === 'banners') pgDeleteBanner(id);
+          if (r === 'categories') {
+            db.products.forEach(x => { if (x.category === id) x.category = ''; });
+            await pgDeleteCategory(id);
+          }
+          if (r === 'products') await pgDeleteProduct(id);
+          if (r === 'banners') await pgDeleteBanner(id);
+          if (r === 'enquiries') await pgDeleteEnquiry(id);
           return send(res, 200, { ok: 1 });
         }
       }
