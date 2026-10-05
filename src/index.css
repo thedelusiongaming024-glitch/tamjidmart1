@@ -1,0 +1,101 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    touch-action: manipulation;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-[#faf8f5] text-ink font-sans antialiased min-h-screen selection:bg-espresso selection:text-white;
+    touch-action: manipulation;
+  }
+  /* Prevent iOS mobile Safari auto-zoom on form field focus */
+  @media (max-width: 768px) {
+    input, select, textarea, .input {
+      font-size: 16px !important;
+    }
+  }
+  body:before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background: 
+      radial-gradient(900px 600px at 0% 0%, #f4eee6 0%, transparent 70%),
+      radial-gradient(800px 500px at 100% 20%, #efe7dd 0%, transparent 60%),
+      radial-gradient(900px 700px at 50% 100%, #f7f2ea 0%, transparent 70%);
+  }
+  h1, h2, h3, h4 {
+    @apply font-serif font-bold tracking-tight text-[#1c1917];
+  }
+  :focus-visible {
+    @apply outline outline-2 outline-offset-2 outline-espresso;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply bg-white/80 backdrop-blur-md border border-black/[0.06] shadow-card;
+  }
+  .glass-dark {
+    @apply bg-black/60 backdrop-blur-md border border-white/10;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl font-semibold bg-espresso text-white border border-transparent transition-all duration-200 hover:bg-espresso-dark hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60 disabled:hover:translate-y-0 cursor-pointer;
+  }
+  .btn-cream {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl font-semibold bg-[#eae4db] text-[#2c221e] border border-black/5 transition-all duration-200 hover:bg-[#dfd7cc] hover:-translate-y-0.5 active:translate-y-0 cursor-pointer;
+  }
+  .btn-ghost {
+    @apply bg-white/80 text-ink border border-black/10 hover:bg-white hover:border-black/20;
+  }
+  .btn-sm {
+    @apply px-4 py-2 text-[13px] rounded-xl;
+  }
+  .input {
+    @apply w-full px-4 py-3 rounded-xl border border-black/10 bg-white/90 outline-none transition-all focus:border-espresso focus:ring-2 focus:ring-espresso/20 text-sm;
+  }
+  .pill {
+    @apply px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#ece5dc] text-espresso;
+  }
+  .pill.off {
+    @apply bg-black/5 text-mut;
+  }
+  .panel {
+    @apply glass rounded-3xl p-6 mb-6 overflow-auto;
+  }
+  .tbl {
+    @apply w-full text-left min-w-[560px];
+  }
+  .tbl th {
+    @apply text-xs text-mut p-3 font-semibold uppercase tracking-wider;
+  }
+  .tbl td {
+    @apply p-3 border-t border-black/5 align-middle text-sm;
+  }
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+  html {
+    scroll-behavior: auto;
+  }
+}
+
